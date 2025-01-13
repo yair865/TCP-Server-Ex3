@@ -1,5 +1,5 @@
 #pragma once
-
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <winsock2.h>
 #include <string>
 #include <vector>
@@ -20,9 +20,11 @@ private:
         SOCKET id;
         int recv;
         int send;
-        int sendSubType;
-        char buffer[1024];
-        int len;
+        RequestType sendSubType;
+        std::string request;
+        int requestLen;
+        char buffer[2048];
+        int bufferLen;
     }SocketState;
 
     bool addSocket(SOCKET id, int what);
@@ -39,6 +41,6 @@ private:
     std::vector<SocketState> sockets;
     int socketsCount;
     RequestHandler requestHandler;
-
+    HttpParser parser;
 
 };

@@ -1,25 +1,37 @@
 #pragma once
-
+#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <unordered_map>
-#include <iostream>
-#include <fstream>
+#include <fstream>    
+#include <sstream>     
+#include <iostream>    
+#include <windows.h> 
+#include "HttpParser.h"
 
-class RequestHandler
-{
+
+
+class RequestHandler{
 public:
     RequestHandler();
     ~RequestHandler();
 
     // Main function to handle HTTP requests
-    void handleRequest(const char* request, char* response);
+    void handleRequest(RequestType method,const std::string& request, char* response);
 
 private:
+    HttpParser parser;
     // Helper functions to process specific HTTP methods
-    void handleGET(const char* request, char* response);
-    void handlePOST(const char* request, char* response);
-    void handlePUT(const char* request, char* response);
-    void handleDELETE(const char* request, char* response);
+    void handleGET(const std::string& request, char* response);
+    void handlePOST(const std::string& request, char* response);
+    void handlePUT(const std::string& request, char* response);
+    void handleDELETE(const std::string& request, char* response);
+    void handleHEAD(const std::string& request, char* response);
+    void handleOPTIONS(const std::string& request, char* response);
+    void handleTRACE(const std::string& request, char* response);
+    void handleINVALID(const std::string& request, char* response);
+
     void saveToFile(const std::string& filename, const char* content);
+
     // Helper to generate the response
     void generateResponse(int statusCode, const char* message, char* response);
 
@@ -27,7 +39,8 @@ private:
     std::unordered_map<std::string, std::string> headers;
     char* body;
 
-    // Constants for HTTP status codes and messages
+    const std::string FILE_PATH = "C:\\temp\\";
+
     static const int HTTP_OK = 200;
     static const int HTTP_BAD_REQUEST = 400;
     static const int HTTP_NOT_FOUND = 404;

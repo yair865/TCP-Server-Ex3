@@ -1,20 +1,18 @@
-#define _CRT_SECURE_NO_WARNINGS
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include "server.h"
+#include "Server.h"
 #include <iostream>
 #include <winsock2.h>
 #include <time.h>
 #include <string.h>
-
+using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
+
 
 const int EMPTY = 0;
 const int LISTEN = 1;
 const int RECEIVE = 2;
 const int IDLE = 3;
 const int SEND = 4;
-const int SEND_TIME = 1;
-const int SEND_SECONDS = 2;
+
 
 Server::Server(int port, int maxSockets)
     : httpPort(port), maxSockets(maxSockets), socketsCount(0)
@@ -136,6 +134,12 @@ void Server::handleSelect()
 
 bool Server::addSocket(SOCKET id, int what)
 {
+    unsigned long flag = 1;
+    if (ioctlsocket(id, FIONBIO, &flag) != 0)
+    {
+        std::cout << "Http Server: Error at ioctlsocket(): " << WSAGetLastError() << std::endl;
+    }
+
     for (int i = 0; i < maxSockets; i++)
     {
         if (sockets[i].recv == EMPTY)
@@ -143,7 +147,7 @@ bool Server::addSocket(SOCKET id, int what)
             sockets[i].id = id;
             sockets[i].recv = what;
             sockets[i].send = IDLE;
-            sockets[i].len = 0;
+            sockets[i].bufferLen = 0;
             socketsCount++;
             return true;
         }
@@ -173,12 +177,7 @@ void Server::acceptConnection(int index)
     }
     std::cout << "Http Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << std::endl;
 
-    unsigned long flag = 1;
-    if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
-    {
-        std::cout << "Http Server: Error at ioctlsocket(): " << WSAGetLastError() << std::endl;
-    }
-
+    
     if (!addSocket(msgSocket, RECEIVE))
     {
         std::cout << "\t\tToo many connections, dropped!\n";
@@ -189,7 +188,7 @@ void Server::acceptConnection(int index)
 void Server::receiveMessage(int index)
 {
     SOCKET msgSocket = sockets[index].id;
-    int len = sockets[index].len;
+    int len = sockets[index].bufferLen;
     int bytesRecv = recv(msgSocket, &sockets[index].buffer[len], sizeof(sockets[index].buffer) - len, 0);
 
     if (SOCKET_ERROR == bytesRecv)
@@ -209,28 +208,17 @@ void Server::receiveMessage(int index)
     {
         sockets[index].buffer[len + bytesRecv] = '\0';
         std::cout << "Http Server: Received: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
-        sockets[index].len += bytesRecv;
+        sockets[index].bufferLen += bytesRecv;
 
-        if (sockets[index].len > 0)
+        if (sockets[index].bufferLen > 0)
         {
-            // Create an instance of the RequestHandler and pass the buffer and response to it
-            char response[1024];
-            requestHandler.handleRequest(sockets[index].buffer, response);
-
-            // If the request is finished (end of headers), send the response
-            if (strstr(sockets[index].buffer, "\r\n\r\n"))
-            {
-                sockets[index].send = SEND;
-                strcpy(sockets[index].buffer, response); // Fill buffer with the response
-                sockets[index].len = (int)strlen(response); // Set the length of the response
-
-                if (strncmp(sockets[index].buffer, "Exit", 4) == 0)
-                {
-                    closesocket(msgSocket);
-                    removeSocket(index);
-                    return;
-                }
-            }
+           std::string bufferStr(sockets[index].buffer);
+           sockets[index].requestLen = parser.extractLen(bufferStr);
+           sockets[index].request = bufferStr.string::substr(0, sockets[index].requestLen);
+           sockets[index].sendSubType = parser.extractMethodType(sockets[index].request);
+           memcpy(sockets[index].buffer, &sockets[index].buffer[sockets[index].requestLen], sockets[index].bufferLen - sockets[index].requestLen);
+           sockets[index].bufferLen -= sockets[index].requestLen;
+           sockets[index].send = SEND;
         }
     }
 }
@@ -238,18 +226,22 @@ void Server::receiveMessage(int index)
 void Server::sendMessage(int index)
 {
     int bytesSent = 0;
-    char sendBuff[1024];
-
-    memset(sendBuff, 0, sizeof(sendBuff));
-
+    char sendBuff[1024] = { 0 };
+    requestHandler.handleRequest(sockets[index].sendSubType, sockets[index].request, sendBuff);
+    sockets[index].request = "";
     SOCKET msgSocket = sockets[index].id;
-    bytesSent = send(msgSocket, sockets[index].buffer, (int)strlen(sockets[index].buffer), 0);
+    bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
     if (SOCKET_ERROR == bytesSent)
     {
         std::cout << "Http Server: Error at send(): " << WSAGetLastError() << std::endl;
         return;
     }
 
-    std::cout << "Http Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sockets[index].buffer << "\" message.\n";
-    sockets[index].send = IDLE;
+    std::cout << "Http Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
+    
+
+    if (sockets[index].bufferLen == 0)
+    {
+       sockets[index].send = IDLE;
+    }
 }
