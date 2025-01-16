@@ -128,12 +128,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="HttpParser.cpp" />
     <ClCompile Include="RequestHandler.cpp" />
-    <ClCompile Include="server.cpp" />
+    <ClCompile Include="RequestType.h" />
+    <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="HttpParser.h" />
     <ClInclude Include="RequestHandler.h" />
-    <ClInclude Include="server.h" />
+    <ClInclude Include="Server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
