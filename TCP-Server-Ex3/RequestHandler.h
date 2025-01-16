@@ -7,6 +7,7 @@
 #include <iostream>    
 #include <windows.h> 
 #include "HttpParser.h"
+#include <ctime>
 
 
 
@@ -30,14 +31,12 @@ private:
     void handleTRACE(const std::string& request, char* response);
     void handleINVALID(const std::string& request, char* response);
 
+    bool fileExists(const std::string& filePath, char* response);
+    std::string validateLanguage(const std::string& langParam, char* response);
+    bool validateResource(const std::string& resource, char* response);
+    std::string buildFilePath(const std::string& langFolder, const std::string& resource);
     void saveToFile(const std::string& filename, const char* content);
-
-    // Helper to generate the response
     void generateResponse(int statusCode, const char* message, char* response);
-
-    char* path;
-    std::unordered_map<std::string, std::string> headers;
-    char* body;
 
     const std::string FILE_PATH = "C:\\temp\\";
 

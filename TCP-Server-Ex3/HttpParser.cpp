@@ -53,7 +53,7 @@ RequestType HttpParser::extractMethodType(const std::string& request)
     return RequestType::INVALID; // Return INVALID if no match is found
 }
 
-std::string HttpParser::extractHeader(const std::string& request, const std::string& header) {
+std::string HttpParser::extractSpecificHeader(const std::string& request, const std::string& header) {
     size_t headerPos = request.find(header);  // Find the start of the header
     if (headerPos != std::string::npos) {
         headerPos += header.length();  // Skip past the header name
@@ -71,6 +71,22 @@ std::string HttpParser::extractHeader(const std::string& request, const std::str
         }
     }
     return "";  // Return empty string if header not found
+}
+
+std::string HttpParser::extractHeaders(const std::string& request) {
+    size_t headerStart = request.find("\r\n"); // Start after the request line
+    if (headerStart == std::string::npos) {
+        return ""; // No headers found
+    }
+    headerStart += 2; // Skip "\r\n"
+
+    size_t bodyStart = request.find("\r\n\r\n", headerStart); // Find the end of headers
+    if (bodyStart == std::string::npos) {
+        bodyStart = request.length(); // No body, treat the end of request as the end of headers
+    }
+
+    // Extract headers as a substring
+    return request.substr(headerStart, bodyStart - headerStart);
 }
 
 std::string HttpParser::extractQueryParam(const std::string& request, const std::string& param) {
@@ -146,6 +162,16 @@ int HttpParser::extractLen(const std::string& request) {
     int contentLength = std::stoi(lengthStr);
 
     return headerEnd + contentLength;
+}
+
+std::string HttpParser::extractRequestLine(const std::string& request)
+{
+    size_t requestLineEnd = request.find("\r\n");
+    if (requestLineEnd != std::string::npos)
+    {
+        return request.substr(0, requestLineEnd);
+    }
+    return "";
 }
 
 HttpParser::HttpParser()
