@@ -230,14 +230,13 @@ void RequestHandler::handlePOST(const std::string& request, char* response)
     }
 
     std::cout << "POST request received for resource: " << resource << "\n";
-    std::cout << "Language folder: " << langFolder << "\n";
     std::cout << "Data: " << body << std::endl;
 
     generateResponse(HTTP_OK, "POST data received successfully", response);
 }
 
 
-void RequestHandler::generateResponse(int statusCode, const char* message, char* response, size_t contentLength = 0)
+void RequestHandler::generateResponse(int statusCode, const char* message, char* response, size_t contentLength)
 {
     const char* status = nullptr;
     switch (statusCode) {
