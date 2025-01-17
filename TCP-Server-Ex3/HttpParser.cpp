@@ -1,24 +1,25 @@
 #include "HttpParser.h"
 
-std::string HttpParser::extractBody(const std::string& request) {
+using namespace std;
+
+string HttpParser::extractBody(const string& request) {
     size_t bodyStart = request.find("\r\n\r\n");
-    if (bodyStart != std::string::npos) {
-        bodyStart += 4;  // Skip the "\r\n\r\n" part
+    if (bodyStart != string::npos) {
+        bodyStart += 4;
         return request.substr(bodyStart);
     }
     return "";
 }
 
-RequestType HttpParser::extractMethodType(const std::string& request)
+RequestType HttpParser::extractMethodType(const string& request)
 {
-    // Extract the first word of the request (the method type)
-    size_t methodEnd = request.find(' '); // Find the first space
-    if (methodEnd == std::string::npos)
+    size_t methodEnd = request.find(' '); 
+    if (methodEnd == string::npos)
     {
-        return RequestType::INVALID; // Invalid request if no space is found
+        return RequestType::INVALID; 
     }
 
-    std::string method = request.substr(0, methodEnd); // Extract the method substring
+    string method = request.substr(0, methodEnd); 
 
 
     if (method == "GET")
@@ -50,95 +51,85 @@ RequestType HttpParser::extractMethodType(const std::string& request)
         return RequestType::TRACE;
     }
 
-    return RequestType::INVALID; // Return INVALID if no match is found
+    return RequestType::INVALID;
 }
 
-std::string HttpParser::extractSpecificHeader(const std::string& request, const std::string& header) {
-    size_t headerPos = request.find(header);  // Find the start of the header
-    if (headerPos != std::string::npos) {
-        headerPos += header.length();  // Skip past the header name
+string HttpParser::extractSpecificHeader(const string& request, const string& header) {
+    size_t headerPos = request.find(header);  
+    if (headerPos != string::npos) {
+        headerPos += header.length();  
 
-        // Skip any whitespace after the colon
-        while (headerPos < request.length() && std::isspace(request[headerPos])) {
+        while (headerPos < request.length() && isspace(request[headerPos])) {
             headerPos++;
         }
 
-        // Find the end of the header value (typically ends with \r\n)
         size_t endOfHeader = request.find("\r\n", headerPos);
 
-        if (endOfHeader != std::string::npos) {
-            return request.substr(headerPos, endOfHeader - headerPos);  // Extract the value
+        if (endOfHeader != string::npos) {
+            return request.substr(headerPos, endOfHeader - headerPos);
         }
     }
-    return "";  // Return empty string if header not found
+    return "";  
 }
 
-std::string HttpParser::extractHeaders(const std::string& request) {
-    size_t headerStart = request.find("\r\n"); // Start after the request line
-    if (headerStart == std::string::npos) {
-        return ""; // No headers found
+string HttpParser::extractHeaders(const string& request) {
+    size_t headerStart = request.find("\r\n"); 
+    if (headerStart == string::npos) {
+        return ""; 
     }
-    headerStart += 2; // Skip "\r\n"
+    headerStart += 2; 
 
-    size_t bodyStart = request.find("\r\n\r\n", headerStart); // Find the end of headers
-    if (bodyStart == std::string::npos) {
-        bodyStart = request.length(); // No body, treat the end of request as the end of headers
+    size_t bodyStart = request.find("\r\n\r\n", headerStart);
+    if (bodyStart == string::npos) {
+        bodyStart = request.length();
     }
 
-    // Extract headers as a substring
     return request.substr(headerStart, bodyStart - headerStart);
 }
 
-std::string HttpParser::extractQueryParam(const std::string& request, const std::string& param) {
-    size_t paramPos = request.find(param + "=");  // Find the parameter and "="
-    if (paramPos != std::string::npos) {
-        paramPos += param.length() + 1;  // Skip past "param="
+string HttpParser::extractQueryParam(const string& request, const string& param) {
+    size_t paramPos = request.find(param + "=");
+    if (paramPos != string::npos) {
+        paramPos += param.length() + 1; 
 
         size_t paramEnd = request.find(" ", paramPos);  
 
-        // If no "&" is found, we are at the end of the query string
-        if (paramEnd == std::string::npos) {
-            return request.substr(paramPos);  // Return the value of the last parameter
+        if (paramEnd == string::npos) {
+            return request.substr(paramPos); 
         }
         else {
-            return request.substr(paramPos, paramEnd - paramPos);  // Return the value between "=" and "&"
+            return request.substr(paramPos, paramEnd - paramPos);
         }
     }
 
-    return "";  // Return empty string if the parameter is not found
+    return "";
 }
 
 
-std::string HttpParser::extractResource(const std::string& request) {
-    // Find the first space after the HTTP method (GET/POST/etc.)
+string HttpParser::extractResource(const string& request) {
     size_t resourceStart = request.find(" ");
-    if (resourceStart != std::string::npos) {
-        resourceStart++;  // Skip past the method (GET/POST/etc.)
+    if (resourceStart != string::npos) {
+        resourceStart++;
 
-        // Find the next space, which separates the resource from the HTTP version
         size_t resourceEnd = request.find(" ", resourceStart);
-        if (resourceEnd != std::string::npos) {
-            // Now check if there is a query parameter (?)
+        if (resourceEnd != string::npos) {
             size_t queryPos = request.find("?", resourceStart);
-            if (queryPos != std::string::npos && queryPos < resourceEnd) {
-                // Extract the resource part before the query string
+            if (queryPos != string::npos && queryPos < resourceEnd) {
                 return request.substr(resourceStart, queryPos - resourceStart);
-            }
-            else {
-                // No query parameter, so extract the entire resource until the HTTP version
+            } else {
                 return request.substr(resourceStart, resourceEnd - resourceStart);
             }
         }
     }
-    return "";  // Return an empty string if resource isn't found
+    return "";
 }
 
 
-int HttpParser::extractLen(const std::string& request) {
-    const std::string contentLengthHeader = "Content-Length: ";
+int HttpParser::extractLen(const string& request) {
+    const string contentLengthHeader = "Content-Length: ";
 
     size_t headerEnd = request.find("\r\n\r\n");
-    if (headerEnd == std::string::npos) {
+    if (headerEnd == string::npos) {
 
         return 0;
     }
@@ -146,28 +137,28 @@ int HttpParser::extractLen(const std::string& request) {
     headerEnd += 4;
 
     size_t contentLengthPos = request.find(contentLengthHeader);
-    if (contentLengthPos == std::string::npos || contentLengthPos > headerEnd) {
+    if (contentLengthPos == string::npos || contentLengthPos > headerEnd) {
 
         return headerEnd;
     }
     contentLengthPos += contentLengthHeader.length();
 
     size_t contentLengthEnd = request.find("\r\n", contentLengthPos);
-    if (contentLengthEnd == std::string::npos) {
+    if (contentLengthEnd == string::npos) {
 
         return headerEnd;
     }
-    std::string lengthStr = request.substr(contentLengthPos, contentLengthEnd - contentLengthPos);
+    string lengthStr = request.substr(contentLengthPos, contentLengthEnd - contentLengthPos);
 
-    int contentLength = std::stoi(lengthStr);
+    int contentLength = stoi(lengthStr);
 
     return headerEnd + contentLength;
 }
 
-std::string HttpParser::extractRequestLine(const std::string& request)
+string HttpParser::extractRequestLine(const string& request)
 {
     size_t requestLineEnd = request.find("\r\n");
-    if (requestLineEnd != std::string::npos)
+    if (requestLineEnd != string::npos)
     {
         return request.substr(0, requestLineEnd);
     }

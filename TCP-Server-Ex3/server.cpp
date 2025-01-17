@@ -6,14 +6,6 @@
 using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
 
-
-const int EMPTY = 0;
-const int LISTEN = 1;
-const int RECEIVE = 2;
-const int IDLE = 3;
-const int SEND = 4;
-
-
 Server::Server(int port, int maxSockets)
     : httpPort(port), maxSockets(maxSockets), socketsCount(0)
 {
@@ -30,14 +22,14 @@ bool Server::initialize()
     WSADATA wsaData;
     if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
     {
-        std::cout << "Http Server: Error at WSAStartup()\n";
+        cout << "Http Server: Error at WSAStartup()\n";
         return false;
     }
 
     listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (INVALID_SOCKET == listenSocket)
     {
-        std::cout << "Http Server: Error at socket(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at socket(): " << WSAGetLastError() << endl;
         WSACleanup();
         return false;
     }
@@ -49,7 +41,7 @@ bool Server::initialize()
 
     if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
     {
-        std::cout << "Http Server: Error at bind(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at bind(): " << WSAGetLastError() << endl;
         closesocket(listenSocket);
         WSACleanup();
         return false;
@@ -57,7 +49,7 @@ bool Server::initialize()
 
     if (SOCKET_ERROR == listen(listenSocket, 5))
     {
-        std::cout << "Http Server: Error at listen(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at listen(): " << WSAGetLastError() << endl;
         closesocket(listenSocket);
         WSACleanup();
         return false;
@@ -69,6 +61,8 @@ bool Server::initialize()
 
 void Server::run()
 {
+    cout << "Http Server is listening on port " << SERVER_PORT << "..." << endl;
+
     while (true)
     {
         handleSelect();
@@ -96,7 +90,7 @@ void Server::handleSelect()
     int nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
     if (nfd == SOCKET_ERROR)
     {
-        std::cout << "Http Server: Error at select(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at select(): " << WSAGetLastError() << endl;
         return;
     }
 
@@ -137,7 +131,7 @@ bool Server::addSocket(SOCKET id, int what)
     unsigned long flag = 1;
     if (ioctlsocket(id, FIONBIO, &flag) != 0)
     {
-        std::cout << "Http Server: Error at ioctlsocket(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
     }
 
     for (int i = 0; i < maxSockets; i++)
@@ -172,15 +166,15 @@ void Server::acceptConnection(int index)
     SOCKET msgSocket = accept(id, (struct sockaddr*)&from, &fromLen);
     if (INVALID_SOCKET == msgSocket)
     {
-        std::cout << "Http Server: Error at accept(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at accept(): " << WSAGetLastError() << endl;
         return;
     }
-    std::cout << "Http Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << std::endl;
+    cout << "Http Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
     
     if (!addSocket(msgSocket, RECEIVE))
     {
-        std::cout << "\t\tToo many connections, dropped!\n";
+        cout << "\t\tToo many connections, dropped!\n";
         closesocket(id);
     }
 }
@@ -193,7 +187,7 @@ void Server::receiveMessage(int index)
 
     if (SOCKET_ERROR == bytesRecv)
     {
-        std::cout << "Http Server: Error at recv(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at recv(): " << WSAGetLastError() << endl;
         closesocket(msgSocket);
         removeSocket(index);
         return;
@@ -207,12 +201,12 @@ void Server::receiveMessage(int index)
     else
     {
         sockets[index].buffer[len + bytesRecv] = '\0';
-        std::cout << "Http Server: Received: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
+        cout << "Http Server: Received: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
         sockets[index].bufferLen += bytesRecv;
 
         if (sockets[index].bufferLen > 0)
         {
-           std::string bufferStr(sockets[index].buffer);
+           string bufferStr(sockets[index].buffer);
            sockets[index].requestLen = parser.extractLen(bufferStr);
            sockets[index].request = bufferStr.string::substr(0, sockets[index].requestLen);
            sockets[index].sendSubType = parser.extractMethodType(sockets[index].request);
@@ -226,18 +220,18 @@ void Server::receiveMessage(int index)
 void Server::sendMessage(int index)
 {
     int bytesSent = 0;
-    char sendBuff[1024] = { 0 };
+    char sendBuff[MAX_BUFFER_SIZE] = { 0 };
     requestHandler.handleRequest(sockets[index].sendSubType, sockets[index].request, sendBuff);
     sockets[index].request = "";
     SOCKET msgSocket = sockets[index].id;
     bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
     if (SOCKET_ERROR == bytesSent)
     {
-        std::cout << "Http Server: Error at send(): " << WSAGetLastError() << std::endl;
+        cout << "Http Server: Error at send(): " << WSAGetLastError() << endl;
         return;
     }
 
-    std::cout << "Http Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
+    cout << "Http Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
     
 
     if (sockets[index].bufferLen == 0)

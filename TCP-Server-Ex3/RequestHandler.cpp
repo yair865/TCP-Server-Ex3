@@ -1,6 +1,8 @@
 #include "RequestHandler.h"
 #include <cstring>
 
+using namespace std;
+
 RequestHandler::RequestHandler()
 {
 }
@@ -9,7 +11,7 @@ RequestHandler::~RequestHandler()
 {
 }
 
-void RequestHandler::handleRequest(RequestType method, const std::string& request, char* response)
+void RequestHandler::handleRequest(RequestType method, const string& request, char* response)
 {
     switch (method) {
     case RequestType::GET:
@@ -40,8 +42,7 @@ void RequestHandler::handleRequest(RequestType method, const std::string& reques
     }
 }
 
-// Helper function: Validate language and return folder
-std::string RequestHandler::validateLanguage(const std::string& langParam, char* response)
+string RequestHandler::validateLanguage(const string& langParam, char* response)
 {
     if (langParam.empty()) {
         return "en";
@@ -55,14 +56,12 @@ std::string RequestHandler::validateLanguage(const std::string& langParam, char*
     return "";
 }
 
-// Helper function: Build file path
-std::string RequestHandler::buildFilePath(const std::string& langFolder, const std::string& resource)
+string RequestHandler::buildFilePath(const string& langFolder, const string& resource)
 {
     return  FILE_PATH + langFolder + resource;
 }
 
-// Helper function: Check resource existence and respond
-bool RequestHandler::validateResource(const std::string& resource, char* response)
+bool RequestHandler::validateResource(const string& resource, char* response)
 {
     if (resource.empty()) {
         generateResponse(HTTP_BAD_REQUEST, "Invalid URL in request", response);
@@ -71,10 +70,9 @@ bool RequestHandler::validateResource(const std::string& resource, char* respons
     return true;
 }
 
-// Helper function: Check file existence
-bool RequestHandler::fileExists(const std::string& filePath, char* response)
+bool RequestHandler::fileExists(const string& filePath, char* response)
 {
-    std::ifstream file(filePath);
+    ifstream file(filePath);
     if (!file.is_open()) {
         generateResponse(HTTP_NOT_FOUND, "File not found", response);
         return false;
@@ -82,77 +80,62 @@ bool RequestHandler::fileExists(const std::string& filePath, char* response)
     return true;
 }
 
-void RequestHandler::handleHEAD(const std::string& request, char* response)
+
+void RequestHandler::handleGET(const string& request, char* response)
 {
-    std::string resource = parser.extractResource(request);
+    string resource = parser.extractResource(request);
     if (!validateResource(resource, response)) return;
 
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
     if (langFolder.empty()) return;
 
-    std::string filePath = buildFilePath(langFolder, resource);
+    string filePath = buildFilePath(langFolder, resource);
     if (!fileExists(filePath, response)) return;
 
-    std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
-        generateResponse(HTTP_INTERNAL_SERVER_ERROR, "Unable to open file", response);
+    stringstream buffer;
+    ifstream file(filePath);
+    buffer << file.rdbuf();
+    file.close();
+    generateResponse(HTTP_OK, buffer.str(), response);
+}
+
+void RequestHandler::handlePOST(const string& request, char* response)
+{
+    string resource = parser.extractResource(request);
+    if (!validateResource(resource, response)) return;
+
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    if (langFolder.empty()) return;
+
+    string body = parser.extractBody(request);
+    if (body.empty()) {
+        generateResponse(HTTP_BAD_REQUEST, "POST body not found", response);
         return;
     }
-    size_t fileSize = file.tellg();
-    file.close();
 
-    generateResponse(HTTP_OK, "", response, fileSize);
+    string contentType = parser.extractSpecificHeader(request, "Content-Type:");
+    if (contentType != "text/plain") {
+        generateResponse(HTTP_BAD_REQUEST, "Unsupported content type. Only text/plain is supported for POST method.", response);
+        return;
+    }
+
+    cout << "POST request received for resource: " << resource << "\n";
+    cout << "Data: " << body << endl;
+
+    generateResponse(HTTP_OK, "POST data received successfully", response);
 }
 
-
-void RequestHandler::handleOPTIONS(const std::string& request, char* response)
+void RequestHandler::handlePUT(const string& request, char* response)
 {
-    std::string resource = parser.extractResource(request);
+    string resource = parser.extractResource(request);
     if (!validateResource(resource, response)) return;
 
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
     if (langFolder.empty()) return;
 
-    std::string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
+    string filePath = buildFilePath(langFolder, resource);
 
-    std::string allowedMethods = "GET, POST, PUT, DELETE, OPTIONS";
-    generateResponse(HTTP_OK, allowedMethods.c_str(), response);
-}
-
-void RequestHandler::handleTRACE(const std::string& request, char* response)
-{
-    std::string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
-
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
-    if (langFolder.empty()) return;
-
-    std::string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
-
-    std::ostringstream traceResponse;
-    traceResponse << parser.extractRequestLine(request) << "\r\n";
-    traceResponse << parser.extractHeaders(request);
-    generateResponse(HTTP_OK, traceResponse.str().c_str(), response);
-}
-
-void RequestHandler::handleINVALID(const std::string& request, char* response)
-{
-    generateResponse(HTTP_BAD_REQUEST, "Unsupported Method", response);
-}
-
-void RequestHandler::handlePUT(const std::string& request, char* response)
-{
-    std::string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
-
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
-    if (langFolder.empty()) return;
-
-    std::string filePath = buildFilePath(langFolder, resource);
-
-    std::string body = parser.extractBody(request);
+    string body = parser.extractBody(request);
     if (body.empty()) {
         generateResponse(HTTP_BAD_REQUEST, "PUT request body is empty", response);
         return;
@@ -168,19 +151,18 @@ void RequestHandler::handlePUT(const std::string& request, char* response)
     }
 }
 
-
-void RequestHandler::handleDELETE(const std::string& request, char* response)
+void RequestHandler::handleDELETE(const string& request, char* response)
 {
-    std::string resource = parser.extractResource(request);
+    string resource = parser.extractResource(request);
     if (!validateResource(resource, response)) return;
 
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
     if (langFolder.empty()) return;
 
-    std::string filePath = buildFilePath(langFolder, resource);
+    string filePath = buildFilePath(langFolder, resource);
 
-    if (std::ifstream(filePath).good()) {
-        if (std::remove(filePath.c_str()) == 0) {
+    if (ifstream(filePath).good()) {
+        if (remove(filePath.c_str()) == 0) {
             generateResponse(HTTP_OK, "Resource deleted successfully", response);
         }
         else {
@@ -192,96 +174,133 @@ void RequestHandler::handleDELETE(const std::string& request, char* response)
     }
 }
 
-void RequestHandler::handleGET(const std::string& request, char* response)
+void RequestHandler::handleHEAD(const string& request, char* response)
 {
-    std::string resource = parser.extractResource(request);
+    string resource = parser.extractResource(request);
     if (!validateResource(resource, response)) return;
 
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
     if (langFolder.empty()) return;
 
-    std::string filePath = buildFilePath(langFolder, resource);
+    string filePath = buildFilePath(langFolder, resource);
     if (!fileExists(filePath, response)) return;
 
-    std::stringstream buffer;
-    std::ifstream file(filePath);
+    stringstream buffer;
+    ifstream file(filePath);
     buffer << file.rdbuf();
-    generateResponse(HTTP_OK, buffer.str().c_str(), response);
+    file.close();
+
+    generateResponse(HTTP_OK, "", response, buffer.str().length());
 }
 
-void RequestHandler::handlePOST(const std::string& request, char* response)
+
+void RequestHandler::handleOPTIONS(const string& request, char* response)
 {
-    std::string resource = parser.extractResource(request);
+    string resource = parser.extractResource(request);
     if (!validateResource(resource, response)) return;
 
-    std::string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
     if (langFolder.empty()) return;
 
-    std::string body = parser.extractBody(request);
-    if (body.empty()) {
-        generateResponse(HTTP_BAD_REQUEST, "POST body not found", response);
-        return;
-    }
+    string filePath = buildFilePath(langFolder, resource);
+    if (!fileExists(filePath, response)) return;
 
-    std::string contentType = parser.extractSpecificHeader(request, "Content-Type:");
-    if (contentType != "text/plain") { 
-        generateResponse(HTTP_BAD_REQUEST, "Unsupported content type. Only text/plain is supported for POST method.", response);
-        return;
-    }
-
-    std::cout << "POST request received for resource: " << resource << "\n";
-    std::cout << "Data: " << body << std::endl;
-
-    generateResponse(HTTP_OK, "POST data received successfully", response);
+    string allowedMethods = "GET, POST, PUT, DELETE, OPTIONS";
+    generateResponse(HTTP_OK, allowedMethods.c_str(), response);
 }
 
-
-void RequestHandler::generateResponse(int statusCode, const char* message, char* response, size_t contentLength)
+void RequestHandler::handleTRACE(const string& request, char* response)
 {
-    const char* status = nullptr;
-    switch (statusCode) {
-    case HTTP_OK: status = "200 OK"; break;
-    case HTTP_BAD_REQUEST: status = "400 Bad Request"; break;
-    case HTTP_NOT_FOUND: status = "404 Not Found"; break;
-    case HTTP_INTERNAL_SERVER_ERROR: status = "500 Internal Server Error"; break;
-    default: status = "500 Internal Server Error"; break;
-    }
+    string resource = parser.extractResource(request);
+    if (!validateResource(resource, response)) return;
 
-    time_t now = time(0);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    if (langFolder.empty()) return;
+
+    string filePath = buildFilePath(langFolder, resource);
+    if (!fileExists(filePath, response)) return;
+
+    ostringstream traceResponse;
+    traceResponse << parser.extractRequestLine(request) << "\r\n";
+    traceResponse << parser.extractHeaders(request);
+    generateResponse(HTTP_OK, traceResponse.str().c_str(), response);
+}
+
+void RequestHandler::handleINVALID(const string& request, char* response)
+{
+    generateResponse(HTTP_BAD_REQUEST, "Unsupported Method", response);
+}
+
+string RequestHandler::getStatusMessage(int statusCode) {
+    switch (statusCode) {
+    case HTTP_OK: return "200 OK";
+    case HTTP_BAD_REQUEST: return "400 Bad Request";
+    case HTTP_NOT_FOUND: return "404 Not Found";
+    case HTTP_INTERNAL_SERVER_ERROR: return "500 Internal Server Error";
+    default: return "500 Internal Server Error";
+    }
+}
+
+string RequestHandler::getCurrentTime() {
+    time_t now = time(nullptr);
     char dateStr[100];
     strftime(dateStr, sizeof(dateStr), "%a, %d %b %Y %H:%M:%S GMT", gmtime(&now));
+    return string(dateStr);
+}
 
-    const char* server = "HTTP Web Server";
+string RequestHandler::generateResponseBody(const string& status, const string& message) {
+    ostringstream bodyStream;
+    bodyStream << "<!DOCTYPE html>\n"
+        << "<html>\n"
+        << "<head>\n"
+        << "    <meta charset=\"UTF-8\">\n"
+        << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+        << "    <title>" << status << "</title>\n"
+        << "</head>\n"
+        << "<body>\n"
+        << "    <h1>" << status << "</h1>\n"
+        << "    <p>" << message << "</p>\n"
+        << "</body>\n"
+        << "</html>";
+    return bodyStream.str();
+}
 
-    const char* responseTemplate = "HTTP/1.1 %s\r\n"
-        "Content-Type: text/html\r\n"
-        "Content-Length: %zu\r\n"
-        "Server: %s\r\n"
-        "Date: %s\r\n\r\n%s";
+string RequestHandler::buildHttpResponse(const string& status, const string& date, const string& body, size_t contentLength) {
+    ostringstream responseStream;
+    responseStream << "HTTP/1.1 " << status << "\r\n"
+        << "Content-Type: text/html\r\n"
+        << "Content-Length: " << contentLength << "\r\n"
+        << "Server: HTTP Web Server\r\n"
+        << "Date: " << date << "\r\n"
+        << "\r\n"
+        << body;
+    return responseStream.str();
+}
 
-    size_t length = contentLength > 0 ? contentLength : strlen(message);
+void RequestHandler::generateResponse(int statusCode, const string& message, char*& response, size_t contentLength) {
+    string status = getStatusMessage(statusCode);
+    string date = getCurrentTime();
+    string responseBody = (statusCode != HTTP_OK) ? generateResponseBody(status, message) : message;
+    size_t length = (contentLength > 0) ? contentLength : responseBody.length();
+    string httpResponse = buildHttpResponse(status, date, responseBody, length);
 
-    size_t responseSize = strlen(status) + strlen(server) + strlen(dateStr) + 200 + length;
-    snprintf(response, responseSize, responseTemplate, status, length, server, dateStr, message);
+    strcpy(response, httpResponse.c_str());
 }
 
 
-void RequestHandler::saveToFile(const std::string& filename, const char* content)
+void RequestHandler::saveToFile(const string& filename, const char* content)
 {
-    std::string filePath = filename;
+    string filePath = filename;
 
-    std::ofstream file(filePath, std::ios::binary);
+    ofstream file(filePath, ios::binary);
     if (file.is_open())
     {
         file.write(content, strlen(content));
         file.close();
-        std::cout << "File saved successfully to " << filePath << std::endl;
+        cout << "File saved successfully to " << filePath << endl;
     }
     else
     {
-        std::cerr << "Failed to save the file to " << filePath << std::endl;
+        cerr << "Failed to save the file to " << filePath << endl;
     }
 }
-
-
-

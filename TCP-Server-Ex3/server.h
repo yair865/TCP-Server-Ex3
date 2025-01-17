@@ -5,10 +5,15 @@
 #include <vector>
 #include "RequestHandler.h"
 
+#define SERVER_PORT 27015
+#define MAX_SOCKETS_NUMBER 60
+#define MAX_SOCKET_BUFFER_SIZE 2048
+#define MAX_BUFFER_SIZE 2048
+
 class Server
 {
 public:
-    Server(int port = 27015, int maxSockets = 60);
+    Server(int port = SERVER_PORT, int maxSockets = MAX_SOCKETS_NUMBER);
     ~Server();
 
     bool initialize();
@@ -23,7 +28,7 @@ private:
         RequestType sendSubType;
         std::string request;
         int requestLen;
-        char buffer[2048];
+        char buffer[MAX_SOCKET_BUFFER_SIZE];
         int bufferLen;
     }SocketState;
 
@@ -32,7 +37,6 @@ private:
     void acceptConnection(int index);
     void receiveMessage(int index);
     void sendMessage(int index);
-
     void handleSelect();
 
     SOCKET listenSocket;
@@ -43,4 +47,9 @@ private:
     RequestHandler requestHandler;
     HttpParser parser;
 
+    static const int EMPTY = 0;
+    static const int LISTEN = 1;
+    static const int RECEIVE = 2;
+    static const int IDLE = 3;
+    static const int SEND = 4;
 };

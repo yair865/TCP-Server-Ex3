@@ -16,12 +16,9 @@ public:
     RequestHandler();
     ~RequestHandler();
 
-    // Main function to handle HTTP requests
     void handleRequest(RequestType method,const std::string& request, char* response);
 
 private:
-    HttpParser parser;
-    // Helper functions to process specific HTTP methods
     void handleGET(const std::string& request, char* response);
     void handlePOST(const std::string& request, char* response);
     void handlePUT(const std::string& request, char* response);
@@ -36,9 +33,14 @@ private:
     bool validateResource(const std::string& resource, char* response);
     std::string buildFilePath(const std::string& langFolder, const std::string& resource);
     void saveToFile(const std::string& filename, const char* content);
-    void generateResponse(int statusCode, const char* message, char* response, size_t contentLength = 0);
+    void generateResponse(int statusCode, const std::string& message, char*& response, size_t contentLength = 0);
+    std::string getStatusMessage(int statusCode);
+    std::string getCurrentTime();
+    std::string generateResponseBody(const std::string& status, const std::string& message);
+    std::string buildHttpResponse(const std::string& status, const std::string& date, const std::string& body, size_t contentLength);
 
     const std::string FILE_PATH = "C:\\temp\\";
+    HttpParser parser;
 
     static const int HTTP_OK = 200;
     static const int HTTP_BAD_REQUEST = 400;
