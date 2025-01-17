@@ -36,7 +36,7 @@ private:
     bool validateResource(const std::string& resource, char* response);
     std::string buildFilePath(const std::string& langFolder, const std::string& resource);
     void saveToFile(const std::string& filename, const char* content);
-    void generateResponse(int statusCode, const char* message, char* response);
+    void generateResponse(int statusCode, const char* message, char* response, size_t contentLength = 0);
 
     const std::string FILE_PATH = "C:\\temp\\";
 
