@@ -1,6 +1,4 @@
 #include "RequestHandler.h"
-#include <cstring>
-
 using namespace std;
 
 RequestHandler::RequestHandler()
@@ -42,7 +40,7 @@ void RequestHandler::handleRequest(RequestType method, const string& request, ch
     }
 }
 
-string RequestHandler::validateLanguage(const string& langParam, char* response)
+string RequestHandler::validateLanguage(const string& langParam, char* response, bool shouldGenerateResponse)
 {
     if (langParam.empty()) {
         return "en";
@@ -52,7 +50,11 @@ string RequestHandler::validateLanguage(const string& langParam, char* response)
         return langParam;
     }
 
-    generateResponse(HTTP_BAD_REQUEST, "Unsupported language", response);
+    if (shouldGenerateResponse)
+    {
+        generateResponse(HTTP_BAD_REQUEST, "Unsupported language", response);
+    }
+
     return "";
 }
 
@@ -61,36 +63,44 @@ string RequestHandler::buildFilePath(const string& langFolder, const string& res
     return  FILE_PATH + langFolder + resource;
 }
 
-bool RequestHandler::validateResource(const string& resource, char* response)
+bool RequestHandler::validateResource(const string& resource, char* response, bool shouldGenerateResponse)
 {
     if (resource.empty()) {
-        generateResponse(HTTP_BAD_REQUEST, "Invalid URL in request", response);
+
+        if (shouldGenerateResponse)
+        {
+            generateResponse(HTTP_BAD_REQUEST, "Invalid URL in request", response);
+        }
+
         return false;
     }
     return true;
 }
 
-bool RequestHandler::fileExists(const string& filePath, char* response)
+bool RequestHandler::fileExists(const string& filePath, char* response, bool shouldGenerateResponse)
 {
     ifstream file(filePath);
     if (!file.is_open()) {
-        generateResponse(HTTP_NOT_FOUND, "File not found", response);
+
+        if (shouldGenerateResponse)
+        {
+            generateResponse(HTTP_NOT_FOUND, "File not found", response);
+        }
         return false;
     }
     return true;
 }
-
 
 void RequestHandler::handleGET(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, AUTO_RESPONSE)) return;
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
     string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
+    if (!fileExists(filePath, response, AUTO_RESPONSE)) return;
 
     stringstream buffer;
     ifstream file(filePath);
@@ -102,9 +112,9 @@ void RequestHandler::handleGET(const string& request, char* response)
 void RequestHandler::handlePOST(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, AUTO_RESPONSE)) return;
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
     string body = parser.extractBody(request);
@@ -128,12 +138,17 @@ void RequestHandler::handlePOST(const string& request, char* response)
 void RequestHandler::handlePUT(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, AUTO_RESPONSE)) return;
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
     string filePath = buildFilePath(langFolder, resource);
+
+    if (!createDirectories(FILE_PATH + langFolder)) {
+        generateResponse(HTTP_INTERNAL_SERVER_ERROR, "Failed to create directories", response);
+        return;
+    }
 
     string body = parser.extractBody(request);
     if (body.empty()) {
@@ -143,7 +158,7 @@ void RequestHandler::handlePUT(const string& request, char* response)
 
     saveToFile(filePath, body.c_str());
 
-    if (fileExists(filePath, response)) {
+    if (fileExists(filePath, response, MANUAL_RESPONSE)) {
         generateResponse(HTTP_OK, "File created or updated successfully", response);
     }
     else {
@@ -154,9 +169,9 @@ void RequestHandler::handlePUT(const string& request, char* response)
 void RequestHandler::handleDELETE(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, AUTO_RESPONSE)) return;
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
     string filePath = buildFilePath(langFolder, resource);
@@ -177,48 +192,51 @@ void RequestHandler::handleDELETE(const string& request, char* response)
 void RequestHandler::handleHEAD(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, MANUAL_RESPONSE))
+    {
+        generateResponse(HTTP_BAD_REQUEST, "", response, NO_BODY);
+        return;
+    }
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
-    if (langFolder.empty()) return;
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, MANUAL_RESPONSE);
+    if (langFolder.empty())
+    {
+        generateResponse(HTTP_BAD_REQUEST, "", response, NO_BODY);
+        return;
+    }
 
     string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
+    if (!fileExists(filePath, response, MANUAL_RESPONSE))
+    {
+        generateResponse(HTTP_NOT_FOUND, "", response, NO_BODY);
+        return;
+    }
 
     stringstream buffer;
     ifstream file(filePath);
     buffer << file.rdbuf();
     file.close();
 
-    generateResponse(HTTP_OK, "", response, buffer.str().length());
+    generateResponse(HTTP_OK, "", response, NO_BODY, buffer.str().length());
 }
 
 
 void RequestHandler::handleOPTIONS(const string& request, char* response)
 {
-    string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
-
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
-    if (langFolder.empty()) return;
-
-    string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
-
-    string allowedMethods = "GET, POST, PUT, DELETE, OPTIONS";
+    string allowedMethods = "Allow: OPTIONS, GET, HEAD, POST, PUT, DELETE, TRACE";
     generateResponse(HTTP_OK, allowedMethods.c_str(), response);
 }
 
 void RequestHandler::handleTRACE(const string& request, char* response)
 {
     string resource = parser.extractResource(request);
-    if (!validateResource(resource, response)) return;
+    if (!validateResource(resource, response, AUTO_RESPONSE)) return;
 
-    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response);
+    string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
     string filePath = buildFilePath(langFolder, resource);
-    if (!fileExists(filePath, response)) return;
+    if (!fileExists(filePath, response, AUTO_RESPONSE)) return;
 
     ostringstream traceResponse;
     traceResponse << parser.extractRequestLine(request) << "\r\n";
@@ -277,16 +295,15 @@ string RequestHandler::buildHttpResponse(const string& status, const string& dat
     return responseStream.str();
 }
 
-void RequestHandler::generateResponse(int statusCode, const string& message, char*& response, size_t contentLength) {
+void RequestHandler::generateResponse(int statusCode, const string& message, char*& response, bool shouldGenerateBody, size_t contentLength) {
     string status = getStatusMessage(statusCode);
     string date = getCurrentTime();
-    string responseBody = (statusCode != HTTP_OK) ? generateResponseBody(status, message) : message;
+    string responseBody = (statusCode != HTTP_OK) && shouldGenerateBody ? generateResponseBody(status, message) : message;
     size_t length = (contentLength > 0) ? contentLength : responseBody.length();
     string httpResponse = buildHttpResponse(status, date, responseBody, length);
 
     strcpy(response, httpResponse.c_str());
 }
-
 
 void RequestHandler::saveToFile(const string& filename, const char* content)
 {
@@ -303,4 +320,14 @@ void RequestHandler::saveToFile(const string& filename, const char* content)
     {
         cerr << "Failed to save the file to " << filePath << endl;
     }
+}
+
+bool RequestHandler::createDirectories(const string& path) {
+    wstring widePath(path.begin(), path.end());
+
+    if (CreateDirectory(widePath.c_str(), NULL) || GetLastError() == ERROR_ALREADY_EXISTS) {
+        return true;
+    }
+
+    return false;
 }

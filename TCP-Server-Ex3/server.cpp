@@ -7,7 +7,7 @@ using namespace std;
 #pragma comment(lib, "Ws2_32.lib")
 
 Server::Server(int port, int maxSockets)
-    : httpPort(port), maxSockets(maxSockets), socketsCount(0)
+    : httpPort(port), maxSockets(maxSockets), socketsCount(0), listenSocket(INVALID_SOCKET)
 {
     sockets.resize(maxSockets);
 }
@@ -87,7 +87,11 @@ void Server::handleSelect()
             FD_SET(sockets[i].id, &waitSend);
     }
 
-    int nfd = select(0, &waitRecv, &waitSend, NULL, NULL);
+    timeval timeout;
+    timeout.tv_sec = SECONDS_TILL_TIMEOUT;
+    timeout.tv_usec = 0;
+
+    int nfd = select(0, &waitRecv, &waitSend, NULL, &timeout);
     if (nfd == SOCKET_ERROR)
     {
         cout << "Http Server: Error at select(): " << WSAGetLastError() << endl;
@@ -124,6 +128,8 @@ void Server::handleSelect()
             }
         }
     }
+
+    handleTimeouts();
 }
 
 bool Server::addSocket(SOCKET id, int what)
@@ -142,6 +148,7 @@ bool Server::addSocket(SOCKET id, int what)
             sockets[i].recv = what;
             sockets[i].send = IDLE;
             sockets[i].bufferLen = 0;
+            sockets[i].lastActivityTime = time(NULL);
             socketsCount++;
             return true;
         }
@@ -206,6 +213,8 @@ void Server::receiveMessage(int index)
 
         if (sockets[index].bufferLen > 0)
         {
+           sockets[index].lastActivityTime = time(NULL);
+
            string bufferStr(sockets[index].buffer);
            sockets[index].requestLen = parser.extractLen(bufferStr);
            sockets[index].request = bufferStr.string::substr(0, sockets[index].requestLen);
@@ -237,5 +246,26 @@ void Server::sendMessage(int index)
     if (sockets[index].bufferLen == 0)
     {
        sockets[index].send = IDLE;
+    }
+}
+
+void Server::handleTimeouts()
+{
+    time_t currentTime = time(nullptr);
+
+    for (int i = 0; i < socketsCount; i++)
+    {
+        if (sockets[i].recv != EMPTY && sockets[i].id != listenSocket)
+        {
+            double duration = difftime(currentTime, sockets[i].lastActivityTime);
+
+            if (duration > SECONDS_TILL_TIMEOUT)
+            {
+                cout << "Server: Closing connection due to timeout.\n";
+                closesocket(sockets[i].id);
+                removeSocket(i);
+                --i;
+            }
+        }
     }
 }

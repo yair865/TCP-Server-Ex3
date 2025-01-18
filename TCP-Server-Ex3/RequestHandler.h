@@ -8,8 +8,11 @@
 #include <windows.h> 
 #include "HttpParser.h"
 #include <ctime>
+#include <cstring>
 
-
+constexpr auto AUTO_RESPONSE = true;
+constexpr auto MANUAL_RESPONSE = false;
+constexpr auto NO_BODY = false;
 
 class RequestHandler{
 public:
@@ -28,16 +31,17 @@ private:
     void handleTRACE(const std::string& request, char* response);
     void handleINVALID(const std::string& request, char* response);
 
-    bool fileExists(const std::string& filePath, char* response);
-    std::string validateLanguage(const std::string& langParam, char* response);
-    bool validateResource(const std::string& resource, char* response);
+    bool fileExists(const std::string& filePath, char* response, bool shouldGenerateResponse);
+    std::string validateLanguage(const std::string& langParam, char* response, bool shouldGenerateResponse);
+    bool validateResource(const std::string& resource, char* response, bool shouldGenerateResponse);
     std::string buildFilePath(const std::string& langFolder, const std::string& resource);
     void saveToFile(const std::string& filename, const char* content);
-    void generateResponse(int statusCode, const std::string& message, char*& response, size_t contentLength = 0);
+    void generateResponse(int statusCode, const std::string& message, char*& response, bool shouldGenerateBody = true, size_t contentLength = 0);
     std::string getStatusMessage(int statusCode);
     std::string getCurrentTime();
     std::string generateResponseBody(const std::string& status, const std::string& message);
     std::string buildHttpResponse(const std::string& status, const std::string& date, const std::string& body, size_t contentLength);
+    bool createDirectories(const std::string& path);
 
     const std::string FILE_PATH = "C:\\temp\\";
     HttpParser parser;

@@ -5,10 +5,24 @@
 #include <vector>
 #include "RequestHandler.h"
 
-#define SERVER_PORT 27015
-#define MAX_SOCKETS_NUMBER 60
-#define MAX_SOCKET_BUFFER_SIZE 2048
-#define MAX_BUFFER_SIZE 2048
+constexpr auto SERVER_PORT = 8080;
+constexpr auto MAX_SOCKETS_NUMBER = 60;
+constexpr auto MAX_SOCKET_BUFFER_SIZE = 2048;
+constexpr auto MAX_BUFFER_SIZE = 2048;
+constexpr auto SECONDS_TILL_TIMEOUT = 120;
+
+typedef struct SocketState
+{
+    SOCKET id;
+    int recv;
+    int send;
+    RequestType sendSubType;
+    std::string request;
+    int requestLen;
+    char buffer[MAX_SOCKET_BUFFER_SIZE];
+    int bufferLen;
+    time_t lastActivityTime;
+}SocketState;
 
 class Server
 {
@@ -20,17 +34,6 @@ public:
     void run();
 
 private:
-    typedef struct SocketState
-    {
-        SOCKET id;
-        int recv;
-        int send;
-        RequestType sendSubType;
-        std::string request;
-        int requestLen;
-        char buffer[MAX_SOCKET_BUFFER_SIZE];
-        int bufferLen;
-    }SocketState;
 
     bool addSocket(SOCKET id, int what);
     void removeSocket(int index);
@@ -38,6 +41,7 @@ private:
     void receiveMessage(int index);
     void sendMessage(int index);
     void handleSelect();
+    void handleTimeouts();
 
     SOCKET listenSocket;
     int httpPort;
