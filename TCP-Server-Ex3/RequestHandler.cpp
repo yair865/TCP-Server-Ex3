@@ -117,15 +117,16 @@ void RequestHandler::handlePOST(const string& request, char* response)
     string langFolder = validateLanguage(parser.extractQueryParam(request, "lang"), response, AUTO_RESPONSE);
     if (langFolder.empty()) return;
 
-    string body = parser.extractBody(request);
-    if (body.empty()) {
-        generateResponse(HTTP_BAD_REQUEST, "POST body not found", response);
+    string contentType = parser.extractSpecificHeader(request, "Content-Type:");
+    if (contentType != "text/plain" || contentType != "text/html") {
+        generateResponse(HTTP_BAD_REQUEST,
+            "Unsupported content type. Only text/plain or text/html is supported for POST method.", response);
         return;
     }
 
-    string contentType = parser.extractSpecificHeader(request, "Content-Type:");
-    if (contentType != "text/plain") {
-        generateResponse(HTTP_BAD_REQUEST, "Unsupported content type. Only text/plain is supported for POST method.", response);
+    string body = parser.extractBody(request);
+    if (body.empty()) {
+        generateResponse(HTTP_BAD_REQUEST, "POST body not found", response);
         return;
     }
 
@@ -147,6 +148,13 @@ void RequestHandler::handlePUT(const string& request, char* response)
 
     if (!createDirectories(FILE_PATH + langFolder)) {
         generateResponse(HTTP_INTERNAL_SERVER_ERROR, "Failed to create directories", response);
+        return;
+    }
+
+    string contentType = parser.extractSpecificHeader(request, "Content-Type:");
+    if (contentType != "text/html") {
+        generateResponse(HTTP_BAD_REQUEST,
+           "Unsupported content type. Only text/html is supported for POST method.", response);
         return;
     }
 
