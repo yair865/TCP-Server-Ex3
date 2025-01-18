@@ -261,7 +261,7 @@ void Server::handleTimeouts()
 
             if (duration > SECONDS_TILL_TIMEOUT)
             {
-                cout << "Server: Closing connection due to timeout.\n";
+                cout << "HTTP Server: Closing connection due to timeout.\n";
                 closesocket(sockets[i].id);
                 removeSocket(i);
                 --i;
